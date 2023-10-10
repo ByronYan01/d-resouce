@@ -1,5 +1,5 @@
 const noop = () => {}
-
+console.log('d-resouce ');
 import { ModeType, errEnum, dirReadEntry } from './utils'
 
 export class ResHandle {
