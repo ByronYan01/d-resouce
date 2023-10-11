@@ -1,24 +1,25 @@
 const noop = () => {}
-console.log('d-resouce ');
-import { ModeType, errEnum, dirReadEntry } from './utils'
+export * from './utils';
 
+import { ModeType, errEnum, dirReadEntry } from './utils'
 export class ResHandle {
   constructor(options) {
     this.targetDom = options.targetDom
     this.dragoverFuc = options.dragoverFuc || noop
     this.dragleaveFuc = options.dragleaveFuc || noop
+    this.dropDataFuc = options.dropDataFuc || noop
     this.validFuc = options.validFuc
-    // 返回的数据格式：数组 array、树形 tree
-    this.mode = options.mode || ModeType.Array
-    // 只读文件（树形 tree 下设置无效）
-    this.onlyFile = options.onlyFile || false
     /**
      * 用于过滤部分文件夹、文件
      *  支持数组、树形数据格式使用
      *  过滤所有文件夹请使用 onlyFile（因为文件夹过滤后，其下文件也就不再读取）
      */
     this.validPushFuc = options.validPushFuc
-    this.dropDataFuc = options.dropDataFuc || noop
+    // 返回的数据格式：数组 array、树形 tree
+    this.mode = options.mode || ModeType.Array
+    // 只读文件（树形 tree 下设置无效）
+    this.onlyFile = options.onlyFile || false
+    
     this.bindFuc = null
     this.targetOverFlag = false
     this.init()
