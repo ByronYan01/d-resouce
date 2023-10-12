@@ -1,28 +1,25 @@
-const noop = () => {}
-export * from './utils';
+const noop = () => {};
+export * from "./utils";
 
-import { ModeType, errEnum, dirReadEntry } from './utils'
+import { ModeType, errEnum, dirReadEntry } from "./utils";
 export class ResHandle {
   constructor(options) {
-    this.targetDom = options.targetDom
-    this.dragoverFuc = options.dragoverFuc || noop
-    this.dragleaveFuc = options.dragleaveFuc || noop
-    this.dropDataFuc = options.dropDataFuc || noop
-    this.validFuc = options.validFuc
-    /**
-     * 用于过滤部分文件夹、文件
-     *  支持数组、树形数据格式使用
-     *  过滤所有文件夹请使用 onlyFile（因为文件夹过滤后，其下文件也就不再读取）
-     */
-    this.validPushFuc = options.validPushFuc
-    // 返回的数据格式：数组 array、树形 tree
-    this.mode = options.mode || ModeType.Array
+    this.targetDom = options.targetDom;
+    this.dragoverFuc = options.dragoverFuc || noop;
+    this.dragleaveFuc = options.dragleaveFuc || noop;
+    this.beforeReadFuc = options.beforeReadFuc;
+    this.readDataFuc = options.readDataFuc || noop;
+    this.validFuc = options.validFuc;
+    // filter resouce
+    this.filterFuc = options.filterFuc;
+    // data Format --- array tree
+    this.mode = options.mode || ModeType.Array;
     // 只读文件（树形 tree 下设置无效）
-    this.onlyFile = options.onlyFile || false
-    
-    this.bindFuc = null
-    this.targetOverFlag = false
-    this.init()
+    this.onlyFile = options.onlyFile || false;
+
+    this.bindFuc = null;
+    this.targetOverFlag = false;
+    this.init();
   }
   init() {
     if (this.targetDom) {
@@ -31,65 +28,81 @@ export class ResHandle {
         getDrapFile: this.getDrapFile.bind(this),
         pasteFuc: this.pasteFuc.bind(this),
         mouseFuc: this.mouseFuc.bind(this),
-      }
-      this.targetDom.addEventListener('mouseenter', this.bindFuc.mouseFuc, false)
-      this.targetDom.addEventListener('mouseleave', this.bindFuc.mouseFuc, false)
+      };
+      this.targetDom.addEventListener(
+        "mouseenter",
+        this.bindFuc.mouseFuc,
+        false
+      );
+      this.targetDom.addEventListener(
+        "mouseleave",
+        this.bindFuc.mouseFuc,
+        false
+      );
       // this.targetDom.addEventListener('paste', this.bindFuc.pasteFuc, false)
-      document.addEventListener('paste', this.bindFuc.pasteFuc, false)
-      this.targetDom.addEventListener('dragover', this.bindFuc.dragFuc, false)
-      this.targetDom.addEventListener('dragleave', this.bindFuc.dragFuc, false)
-      this.targetDom.addEventListener('drop', this.bindFuc.getDrapFile, false)
+      document.addEventListener("paste", this.bindFuc.pasteFuc, false);
+      this.targetDom.addEventListener("dragover", this.bindFuc.dragFuc, false);
+      this.targetDom.addEventListener("dragleave", this.bindFuc.dragFuc, false);
+      this.targetDom.addEventListener("drop", this.bindFuc.getDrapFile, false);
     }
   }
   destroy() {
-    this.targetDom.removeEventListener('dragover', this.bindFuc.dragFuc, false)
-    this.targetDom.removeEventListener('dragleave', this.bindFuc.dragFuc, false)
-    this.targetDom.removeEventListener('drop', this.bindFuc.getDrapFile, false)
-    this.bindFuc = null
+    this.targetDom.removeEventListener("dragover", this.bindFuc.dragFuc, false);
+    this.targetDom.removeEventListener(
+      "dragleave",
+      this.bindFuc.dragFuc,
+      false
+    );
+    this.targetDom.removeEventListener("drop", this.bindFuc.getDrapFile, false);
+    this.bindFuc = null;
   }
   mouseFuc(e) {
-    if (e.type === 'mouseenter') {
-      this.targetOverFlag = true
+    if (e.type === "mouseenter") {
+      this.targetOverFlag = true;
     } else {
       // mouseleave
-      this.targetOverFlag = false
+      this.targetOverFlag = false;
     }
   }
   dragFuc(e) {
-    e.stopPropagation()
-    e.preventDefault()
+    e.stopPropagation();
+    e.preventDefault();
     // if (!e.currentTarget.contains(e.relatedTarget)) {
     //   this.dragOver = false
     // }
-    this[e.type === 'dragover' ? 'dragoverFuc' : 'dragleaveFuc'].call(e.target)
-    return this
+    this[e.type === "dragover" ? "dragoverFuc" : "dragleaveFuc"].call(e.target);
+    return this;
   }
   getDrapFile(e) {
     // 取消 hover 效果
-    this.dragFuc(e)
+    this.dragFuc(e);
     // 获取文件列表对象
-    this.addDataTransfer(e.dataTransfer)
+    this.addDataTransfer(e.dataTransfer);
   }
   pasteFuc(e) {
     // 不在拖拽区域，不处理
-    if (!this.targetOverFlag) return
-    const activeEl = document.activeElement
+    if (!this.targetOverFlag) return;
+    const activeEl = document.activeElement;
     // 在拖拽区域内的输入框黏贴，不处理
-    if (/textarea|input/i.test(activeEl.nodeName)) return
-    this.addDataTransfer(e.clipboardData)
+    if (/textarea|input/i.test(activeEl.nodeName)) return;
+    this.addDataTransfer(e.clipboardData);
   }
   errHanlder(err, cb) {
     // console.log('errHanlder=====', err)
     if (err?.message !== errEnum.stop) {
-      cb && cb()
+      cb && cb();
     }
   }
   addDataTransfer(dataTransfer) {
-    if (dataTransfer?.items?.length) {
-      const entrys = []
+    let ifRead = true;
+    if (typeof this.beforeReadFuc === "function") {
+      ifRead = this.beforeReadFuc();
+    }
+    if (ifRead && dataTransfer?.items?.length) {
+      const entrys = [];
       for (let i = 0; i < dataTransfer.items.length; i++) {
-        const dataTransferTtem = dataTransfer.items[i]
-        let entry
+        const dataTransferTtem = dataTransfer.items[i];
+        let entry;
         // if (dataTransferTtem.getAsEntry) {
         //   entry =
         //     dataTransferTtem.getAsEntry() || dataTransferTtem.getAsFile();
@@ -100,85 +113,87 @@ export class ResHandle {
         // } else {
         //   entry = dataTransferTtem.getAsFile();
         // }
-        entry = dataTransferTtem.webkitGetAsEntry()
+        entry = dataTransferTtem.webkitGetAsEntry();
         if (entry) {
-          entrys.push(entry)
+          entrys.push(entry);
         }
-        this
+        this;
       }
       return this.getContent(entrys).then(
         (blockContent) => {
-          if (typeof this.dropDataFuc === 'function') {
-            this.dropDataFuc(blockContent)
+          if (typeof this.readDataFuc === "function") {
+            this.readDataFuc(blockContent);
           }
         },
         (err) => {
-          this.errHanlder(err)
-        },
-      )
+          this.errHanlder(err);
+        }
+      );
     }
   }
   getContent(entrys) {
     return new Promise((resolve, reject) => {
-      // const blockContent = {}
-      const blockContent = []
+      const blockContent = [];
       const forEach = (i) => {
-        const v = entrys[i]
+        const v = entrys[i];
         if (!v) {
-          return resolve(blockContent)
+          return resolve(blockContent);
         }
-        const fucHanlder = this.mode === 'tree' ? 'getFileSystemEntryTree' : 'getFileSystemEntryArray'
-        this[fucHanlder](v, '').then(
+        const fucHanlder =
+          this.mode === "tree"
+            ? "getFileSystemEntryTree"
+            : "getFileSystemEntryArray";
+        this[fucHanlder](v, "").then(
           function (results) {
-            blockContent.push(...results)
-            forEach(i + 1)
+            blockContent.push(...results);
+            forEach(i + 1);
           },
           (err) => {
-            this.errHanlder(err)
-          },
-        )
-      }
-      forEach(0)
-    })
+            this.errHanlder(err);
+          }
+        );
+      };
+      forEach(0);
+    });
   }
   ifPushValid(targetItem) {
-    if (typeof this.validPushFuc === 'function') {
-      return this.validPushFuc(targetItem)
+    if (typeof this.filterFuc === "function") {
+      return this.filterFuc(targetItem);
     } else {
-      return true
+      return true;
     }
   }
   pushItem(list, item) {
     if (this.ifPushValid(item)) {
-      list.push(item)
-      return item
+      list.push(item);
+      return item;
     }
-    return null
+    return null;
   }
   entryForEach() {}
   // 文件处理
   entryFileHandler(fileEntry, { resolve, reject }, formatter) {
-    const res = []
+    const res = [];
     fileEntry.file((file) => {
-      const fileItem = formatter(file)
-      if (typeof this.validFuc === 'function') {
-        const isPass = this.validFuc(fileItem)
+      const fileItem = formatter(file);
+      if (typeof this.validFuc === "function") {
+        const isPass = this.validFuc(fileItem);
         if (!isPass) {
-          return reject(new Error(errEnum.stop))
+          return reject(new Error(errEnum.stop));
         }
-        this.pushItem(res, fileItem)
-        resolve(res)
+        this.pushItem(res, fileItem);
+        resolve(res);
       } else {
-        this.pushItem(res, fileItem)
-        resolve(res)
+        this.pushItem(res, fileItem);
+        resolve(res);
       }
-    })
+    });
   }
-  getFileSystemEntryTree(entry, path = '') {
+  getFileSystemEntryTree(entry, path = "") {
     return new Promise((resolve, reject) => {
       if (!entry) {
-        resolve([])
-        return
+        resolve([]);
+        return;
       }
 
       if (entry.isFile) {
@@ -189,59 +204,62 @@ export class ResHandle {
             name: file.name,
             type: file.type,
             file,
-          }
-        })
-        return
+          };
+        });
+        return;
       }
 
       if (entry.isDirectory) {
-        let directoryEntry = entry
+        let directoryEntry = entry;
         const curDir = {
           fullPath: path + directoryEntry.name,
           name: directoryEntry.name,
           totalSize: 0,
-          type: 'text/directory',
+          type: "text/directory",
           file: new File([], path + directoryEntry.name, {
-            type: 'text/directory',
+            type: "text/directory",
           }),
           child: [],
-        }
+        };
         if (!this.ifPushValid(curDir)) {
-          return reject(new Error(errEnum.filter))
+          return reject(new Error(errEnum.filter));
         }
         dirReadEntry(directoryEntry, {
           endFuc: () => {
             curDir.totalSize = curDir.child.reduce((acc, cur) => {
-              return acc + (cur?.size || cur?.totalSize)
-            }, 0)
-            return resolve([curDir])
+              return acc + (cur?.size || cur?.totalSize);
+            }, 0);
+            return resolve([curDir]);
           },
           excFuc: (entryItem, { next }) => {
-            this.getFileSystemEntryTree(entryItem, path + directoryEntry.name + '/').then(
+            this.getFileSystemEntryTree(
+              entryItem,
+              path + directoryEntry.name + "/"
+            ).then(
               (results) => {
                 // 父子建立关系(results有可能是空数组)
-                curDir.child.push(...results)
-                next()
+                curDir.child.push(...results);
+                next();
               },
               (err) => {
                 this.errHanlder(err, () => {
-                  next()
-                })
-              },
-            )
+                  next();
+                });
+              }
+            );
           },
-        })
-        return
+        });
+        return;
       }
 
-      resolve([])
-    })
+      resolve([]);
+    });
   }
-  getFileSystemEntryArray(entry, path = '') {
+  getFileSystemEntryArray(entry, path = "") {
     return new Promise((resolve, reject) => {
       if (!entry) {
-        resolve([])
-        return
+        resolve([]);
+        return;
       }
 
       if (entry.isFile) {
@@ -252,29 +270,29 @@ export class ResHandle {
             name: file.name,
             type: file.type,
             file,
-          }
-        })
-        return
+          };
+        });
+        return;
       }
 
       if (entry.isDirectory) {
-        let directoryEntry = entry
-        const uploadFiles = []
+        let directoryEntry = entry;
+        const uploadFiles = [];
         const curDir = {
           fullPath: path + directoryEntry.name,
           name: directoryEntry.name,
           totalSize: 0,
-          type: 'text/directory',
+          type: "text/directory",
           file: new File([], path + directoryEntry.name, {
-            type: 'text/directory',
+            type: "text/directory",
           }),
-        }
+        };
         if (!this.onlyFile) {
           // 文件夹
-          const pushRes = this.pushItem(uploadFiles, curDir)
+          const pushRes = this.pushItem(uploadFiles, curDir);
           if (!pushRes) {
             // 文件夹被过滤
-            return reject(new Error(errEnum.filter))
+            return reject(new Error(errEnum.filter));
           }
         }
         dirReadEntry(directoryEntry, {
@@ -282,10 +300,10 @@ export class ResHandle {
             if (!this.onlyFile) {
               // 默认第一个是文件夹，后面是其下的文件
               uploadFiles[0].totalSize = uploadFiles.reduce((acc, cur) => {
-                return acc + (cur?.size || 0)
-              }, 0)
+                return acc + (cur?.size || 0);
+              }, 0);
             }
-            return resolve(uploadFiles)
+            return resolve(uploadFiles);
           },
           excFuc: (entryItem, { next }) => {
             /**
@@ -294,25 +312,28 @@ export class ResHandle {
              * uploadFiles 中有 22，results 为 33, q.txt
              * uploadFiles 中有 11，results 为 22, 33, q.txt
              */
-            this.getFileSystemEntryArray(entryItem, path + directoryEntry.name + '/').then(
+            this.getFileSystemEntryArray(
+              entryItem,
+              path + directoryEntry.name + "/"
+            ).then(
               (results) => {
                 // 父子建立关系(results有可能是空数组)
-                console.log('results===', results)
-                uploadFiles.push(...results)
-                next()
+                console.log("results===", results);
+                uploadFiles.push(...results);
+                next();
               },
               (err) => {
                 this.errHanlder(err, () => {
-                  next()
-                })
-              },
-            )
+                  next();
+                });
+              }
+            );
           },
-        })
-        return
+        });
+        return;
       }
 
-      resolve([])
-    })
+      resolve([]);
+    });
   }
 }
